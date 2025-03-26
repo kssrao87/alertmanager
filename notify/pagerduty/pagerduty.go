@@ -311,7 +311,7 @@ func (n *Notifier) notifyV2(
 	if err != nil {
 		return false, err
 	}
-	level.Debug(n.logger).Log("***** in v2 summary:", msg.Payload.Summary, "severity", msg.Payload.Severity, "source", msg.Payload.Source, "event_action", msg.EventAction, "routing", msg.RoutingKey[0:4])
+	level.Debug(n.logger).Log("***** in v2 summary:", msg.Payload.Summary, "severity", msg.Payload.Severity, "source", msg.Payload.Source, "event_action", msg.EventAction, "routing", msg.RoutingKey[len(msg.RoutingKey)-4:])
 	level.Debug(n.logger).Log("***** payload:", newEncodedMsg.String())
 	level.Debug(n.logger).Log("***** pd url:", n.conf.URL.String())
 	resp, err := notify.PostJSON(ctx, n.client, n.conf.URL.String(), &encodedMsg)
