@@ -289,7 +289,31 @@ func (n *Notifier) notifyV2(
 	if err != nil {
 		return false, err
 	}
+
+	newMsg := &pagerDutyMessage{
+		Client:      tmpl(n.conf.Client),
+		ClientURL:   tmpl(n.conf.ClientURL),
+		EventAction: eventType,
+		DedupKey:    key.Hash(),
+		Images:      make([]pagerDutyImage, 0, len(n.conf.Images)),
+		Links:       make([]pagerDutyLink, 0, len(n.conf.Links)),
+		Payload: &pagerDutyPayload{
+			Summary:       summary,
+			Source:        tmpl(n.conf.Source),
+			Severity:      tmpl(n.conf.Severity),
+			CustomDetails: details,
+			Class:         tmpl(n.conf.Class),
+			Component:     tmpl(n.conf.Component),
+			Group:         tmpl(n.conf.Group),
+		},
+	}
+	newEncodedMsg, err := n.encodeMessage(newMsg)
+	if err != nil {
+		return false, err
+	}
 	level.Debug(n.logger).Log("***** in v2 summary:", msg.Payload.Summary, "severity", msg.Payload.Severity, "source", msg.Payload.Source, "event_action", msg.EventAction, "routing", msg.RoutingKey[0:4])
+	level.Debug(n.logger).Log("***** payload:", newEncodedMsg.String())
+	level.Debug(n.logger).Log("***** pd url:", n.conf.URL.String())
 	resp, err := notify.PostJSON(ctx, n.client, n.conf.URL.String(), &encodedMsg)
 	if err != nil {
 		return true, fmt.Errorf("failed to post message to PagerDuty: %w", err)
