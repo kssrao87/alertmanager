@@ -289,7 +289,7 @@ func (n *Notifier) notifyV2(
 	if err != nil {
 		return false, err
 	}
-	level.Debug(n.logger).Log("***** in v2 summary:", msg.Payload.Summary, "severity", msg.Payload.Severity, "source", msg.Payload.Source, "event_action", msg.EventAction)
+	level.Debug(n.logger).Log("***** in v2 summary:", msg.Payload.Summary, "severity", msg.Payload.Severity, "source", msg.Payload.Source, "event_action", msg.EventAction, "routing", msg.RoutingKey[0:4])
 	resp, err := notify.PostJSON(ctx, n.client, n.conf.URL.String(), &encodedMsg)
 	if err != nil {
 		return true, fmt.Errorf("failed to post message to PagerDuty: %w", err)
@@ -298,6 +298,7 @@ func (n *Notifier) notifyV2(
 
 	retry, err := n.retrier.Check(resp.StatusCode, resp.Body)
 	if err != nil {
+		level.Debug(n.logger).Log("***** response:", resp)
 		return retry, notify.NewErrorWithReason(notify.GetFailureReasonFromStatusCode(resp.StatusCode), err)
 	}
 	return retry, err
