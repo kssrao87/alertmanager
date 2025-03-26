@@ -24,7 +24,6 @@ type AlertListMsg
     | MsgForGroupBar GroupBar.Msg
     | ToggleSilenced Bool
     | ToggleInhibited Bool
-    | ToggleMuted Bool
     | SetActive (Maybe String)
     | ActiveGroups Int
     | SetTab Tab

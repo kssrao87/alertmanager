@@ -17,7 +17,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -185,23 +184,22 @@ func (r *Route) Key() string {
 func (r *Route) ID() string {
 	b := strings.Builder{}
 
+	position := -1
 	if r.parent != nil {
-		b.WriteString(r.parent.ID())
-		b.WriteRune('/')
-	}
-
-	b.WriteString(r.Matchers.String())
-
-	if r.parent != nil {
-		for i := range r.parent.Routes {
-			if r == r.parent.Routes[i] {
-				b.WriteRune('/')
-				b.WriteString(strconv.Itoa(i))
+		// Find the position in the same level leaf.
+		for i, cr := range r.parent.Routes {
+			if cr == r {
+				position = i
 				break
 			}
 		}
 	}
+	b.WriteString(r.Key())
 
+	if position > -1 {
+		b.WriteRune('/')
+		b.WriteString(fmt.Sprint(position))
+	}
 	return b.String()
 }
 

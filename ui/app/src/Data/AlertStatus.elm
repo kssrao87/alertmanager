@@ -22,7 +22,6 @@ type alias AlertStatus =
     { state : State
     , silencedBy : List String
     , inhibitedBy : List String
-    , mutedBy : List String
     }
 
 
@@ -38,7 +37,6 @@ decoder =
         |> required "state" stateDecoder
         |> required "silencedBy" (Decode.list Decode.string)
         |> required "inhibitedBy" (Decode.list Decode.string)
-        |> required "mutedBy" (Decode.list Decode.string)
 
 
 encoder : AlertStatus -> Encode.Value
@@ -47,7 +45,6 @@ encoder model =
         [ ( "state", stateEncoder model.state )
         , ( "silencedBy", Encode.list Encode.string model.silencedBy )
         , ( "inhibitedBy", Encode.list Encode.string model.inhibitedBy )
-        , ( "mutedBy", Encode.list Encode.string model.mutedBy )
         ]
 
 

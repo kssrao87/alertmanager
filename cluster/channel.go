@@ -14,10 +14,11 @@
 package cluster
 
 import (
-	"log/slog"
 	"sync"
 	"time"
 
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/gogo/protobuf/proto"
 	"github.com/hashicorp/memberlist"
 	"github.com/prometheus/client_golang/prometheus"
@@ -34,7 +35,7 @@ type Channel struct {
 	sendOversize func(*memberlist.Node, []byte) error
 
 	msgc   chan []byte
-	logger *slog.Logger
+	logger log.Logger
 
 	oversizeGossipMessageFailureTotal prometheus.Counter
 	oversizeGossipMessageDroppedTotal prometheus.Counter
@@ -49,7 +50,7 @@ func NewChannel(
 	send func([]byte),
 	peers func() []*memberlist.Node,
 	sendOversize func(*memberlist.Node, []byte) error,
-	logger *slog.Logger,
+	logger log.Logger,
 	stopc chan struct{},
 	reg prometheus.Registerer,
 ) *Channel {
@@ -69,13 +70,9 @@ func NewChannel(
 		ConstLabels: prometheus.Labels{"key": key},
 	})
 	oversizeGossipDuration := prometheus.NewHistogram(prometheus.HistogramOpts{
-		Name:                            "alertmanager_oversize_gossip_message_duration_seconds",
-		Help:                            "Duration of oversized gossip message requests.",
-		ConstLabels:                     prometheus.Labels{"key": key},
-		Buckets:                         prometheus.DefBuckets,
-		NativeHistogramBucketFactor:     1.1,
-		NativeHistogramMaxBucketNumber:  100,
-		NativeHistogramMinResetDuration: 1 * time.Hour,
+		Name:        "alertmanager_oversize_gossip_message_duration_seconds",
+		Help:        "Duration of oversized gossip message requests.",
+		ConstLabels: prometheus.Labels{"key": key},
 	})
 
 	reg.MustRegister(oversizeGossipDuration, oversizeGossipMessageFailureTotal, oversizeGossipMessageDroppedTotal, oversizeGossipMessageSentTotal)
@@ -112,7 +109,7 @@ func (c *Channel) handleOverSizedMessages(stopc chan struct{}) {
 					c.oversizeGossipMessageSentTotal.Inc()
 					start := time.Now()
 					if err := c.sendOversize(n, b); err != nil {
-						c.logger.Debug("failed to send reliable", "key", c.key, "node", n, "err", err)
+						level.Debug(c.logger).Log("msg", "failed to send reliable", "key", c.key, "node", n, "err", err)
 						c.oversizeGossipMessageFailureTotal.Inc()
 						return
 					}
@@ -138,7 +135,7 @@ func (c *Channel) Broadcast(b []byte) {
 		select {
 		case c.msgc <- b:
 		default:
-			c.logger.Debug("oversized gossip channel full")
+			level.Debug(c.logger).Log("msg", "oversized gossip channel full")
 			c.oversizeGossipMessageDroppedTotal.Inc()
 		}
 	} else {

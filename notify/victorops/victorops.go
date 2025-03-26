@@ -18,11 +18,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"os"
 	"strings"
 
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	commoncfg "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
 
@@ -39,13 +40,13 @@ const maxMessageLenRunes = 20480
 type Notifier struct {
 	conf    *config.VictorOpsConfig
 	tmpl    *template.Template
-	logger  *slog.Logger
+	logger  log.Logger
 	client  *http.Client
 	retrier *notify.Retrier
 }
 
 // New returns a new VictorOps notifier.
-func New(c *config.VictorOpsConfig, t *template.Template, l *slog.Logger, httpOpts ...commoncfg.HTTPClientOption) (*Notifier, error) {
+func New(c *config.VictorOpsConfig, t *template.Template, l log.Logger, httpOpts ...commoncfg.HTTPClientOption) (*Notifier, error) {
 	client, err := commoncfg.NewClientFromConfig(*c.HTTPConfig, "victorops", httpOpts...)
 	if err != nil {
 		return nil, err
@@ -141,7 +142,7 @@ func (n *Notifier) createVictorOpsPayload(ctx context.Context, as ...*types.Aler
 
 	stateMessage, truncated := notify.TruncateInRunes(stateMessage, maxMessageLenRunes)
 	if truncated {
-		n.logger.Warn("Truncated state_message", "incident", key, "max_runes", maxMessageLenRunes)
+		level.Warn(n.logger).Log("msg", "Truncated state_message", "incident", key, "max_runes", maxMessageLenRunes)
 	}
 
 	msg := map[string]string{

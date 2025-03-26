@@ -16,9 +16,10 @@ package reactapp
 import (
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"path"
+
+	"github.com/go-kit/log"
 
 	"github.com/prometheus/common/route"
 	"github.com/prometheus/common/server"
@@ -29,7 +30,7 @@ var reactRouterPaths = []string{
 	"/status",
 }
 
-func Register(r *route.Router, logger *slog.Logger) {
+func Register(r *route.Router, logger log.Logger) {
 	serveReactApp := func(w http.ResponseWriter, r *http.Request) {
 		f, err := Assets.Open("/dist/index.html")
 		if err != nil {

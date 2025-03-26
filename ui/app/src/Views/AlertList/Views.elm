@@ -59,7 +59,6 @@ view { alertGroups, groupBar, filterBar, receiverBar, tab, activeId, activeGroup
                         |> Html.map (MsgForReceiverBar >> MsgForAlertList)
                     , renderCheckbox "Silenced" filter.showSilenced ToggleSilenced
                     , renderCheckbox "Inhibited" filter.showInhibited ToggleInhibited
-                    , renderCheckbox "Muted" filter.showMuted ToggleMuted
                     ]
                 ]
             , div [ class "card-block" ]

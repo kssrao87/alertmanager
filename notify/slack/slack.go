@@ -19,11 +19,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"os"
 	"strings"
 
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	commoncfg "github.com/prometheus/common/config"
 
 	"github.com/prometheus/alertmanager/config"
@@ -39,7 +40,7 @@ const maxTitleLenRunes = 1024
 type Notifier struct {
 	conf    *config.SlackConfig
 	tmpl    *template.Template
-	logger  *slog.Logger
+	logger  log.Logger
 	client  *http.Client
 	retrier *notify.Retrier
 
@@ -47,7 +48,7 @@ type Notifier struct {
 }
 
 // New returns a new Slack notification handler.
-func New(c *config.SlackConfig, t *template.Template, l *slog.Logger, httpOpts ...commoncfg.HTTPClientOption) (*Notifier, error) {
+func New(c *config.SlackConfig, t *template.Template, l log.Logger, httpOpts ...commoncfg.HTTPClientOption) (*Notifier, error) {
 	client, err := commoncfg.NewClientFromConfig(*c.HTTPConfig, "slack", httpOpts...)
 	if err != nil {
 		return nil, err
@@ -111,7 +112,7 @@ func (n *Notifier) Notify(ctx context.Context, as ...*types.Alert) (bool, error)
 		if err != nil {
 			return false, err
 		}
-		n.logger.Warn("Truncated title", "key", key, "max_runes", maxTitleLenRunes)
+		level.Warn(n.logger).Log("msg", "Truncated title", "key", key, "max_runes", maxTitleLenRunes)
 	}
 	att := &attachment{
 		Title:      title,

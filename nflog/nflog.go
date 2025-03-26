@@ -22,16 +22,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"math/rand"
 	"os"
 	"sync"
 	"time"
 
-	"github.com/coder/quartz"
+	"github.com/benbjohnson/clock"
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/matttproud/golang_protobuf_extensions/pbutil"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/common/promslog"
 
 	"github.com/prometheus/alertmanager/cluster"
 	pb "github.com/prometheus/alertmanager/nflog/nflogpb"
@@ -46,7 +46,7 @@ var ErrInvalidState = errors.New("invalid state")
 // query currently allows filtering by and/or receiver group key.
 // It is configured via QueryParameter functions.
 //
-// TODO(fabxc): Future versions could allow querying a certain receiver,
+// TODO(fabxc): Future versions could allow querying a certain receiver
 // group or a given time interval.
 type query struct {
 	recv     *pb.Receiver
@@ -76,9 +76,9 @@ func QGroupKey(gk string) QueryParam {
 
 // Log holds the notification log state for alerts that have been notified.
 type Log struct {
-	clock quartz.Clock
+	clock clock.Clock
 
-	logger    *slog.Logger
+	logger    log.Logger
 	metrics   *metrics
 	retention time.Duration
 
@@ -139,12 +139,8 @@ func newMetrics(r prometheus.Registerer) *metrics {
 		Help: "Number notification log received queries that failed.",
 	})
 	m.queryDuration = prometheus.NewHistogram(prometheus.HistogramOpts{
-		Name:                            "alertmanager_nflog_query_duration_seconds",
-		Help:                            "Duration of notification log query evaluation.",
-		Buckets:                         prometheus.DefBuckets,
-		NativeHistogramBucketFactor:     1.1,
-		NativeHistogramMaxBucketNumber:  100,
-		NativeHistogramMinResetDuration: 1 * time.Hour,
+		Name: "alertmanager_nflog_query_duration_seconds",
+		Help: "Duration of notification log query evaluation.",
 	})
 	m.propagatedMessagesTotal = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "alertmanager_nflog_gossip_messages_propagated_total",
@@ -239,7 +235,7 @@ type Options struct {
 
 	Retention time.Duration
 
-	Logger  *slog.Logger
+	Logger  log.Logger
 	Metrics prometheus.Registerer
 }
 
@@ -259,9 +255,9 @@ func New(o Options) (*Log, error) {
 	}
 
 	l := &Log{
-		clock:     quartz.NewReal(),
+		clock:     clock.New(),
 		retention: o.Retention,
-		logger:    promslog.NewNopLogger(),
+		logger:    log.NewNopLogger(),
 		st:        state{},
 		broadcast: func([]byte) {},
 		metrics:   newMetrics(o.Metrics),
@@ -276,7 +272,7 @@ func New(o Options) (*Log, error) {
 			if !os.IsNotExist(err) {
 				return nil, err
 			}
-			l.logger.Debug("notification log snapshot file doesn't exist", "err", err)
+			level.Debug(l.logger).Log("msg", "notification log snapshot file doesn't exist", "err", err)
 		} else {
 			o.SnapshotReader = r
 			defer r.Close()
@@ -302,10 +298,10 @@ func (l *Log) now() time.Time {
 // If not nil, the last argument is an override for what to do as part of the maintenance - for advanced usage.
 func (l *Log) Maintenance(interval time.Duration, snapf string, stopc <-chan struct{}, override MaintenanceFunc) {
 	if interval == 0 || stopc == nil {
-		l.logger.Error("interval or stop signal are missing - not running maintenance")
+		level.Error(l.logger).Log("msg", "interval or stop signal are missing - not running maintenance")
 		return
 	}
-	t := l.clock.NewTicker(interval)
+	t := l.clock.Ticker(interval)
 	defer t.Stop()
 
 	var doMaintenance MaintenanceFunc
@@ -335,14 +331,14 @@ func (l *Log) Maintenance(interval time.Duration, snapf string, stopc <-chan str
 	runMaintenance := func(do func() (int64, error)) error {
 		l.metrics.maintenanceTotal.Inc()
 		start := l.now().UTC()
-		l.logger.Debug("Running maintenance")
+		level.Debug(l.logger).Log("msg", "Running maintenance")
 		size, err := do()
 		l.metrics.snapshotSize.Set(float64(size))
 		if err != nil {
 			l.metrics.maintenanceErrorsTotal.Inc()
 			return err
 		}
-		l.logger.Debug("Maintenance done", "duration", l.now().Sub(start), "size", size)
+		level.Debug(l.logger).Log("msg", "Maintenance done", "duration", l.now().Sub(start), "size", size)
 		return nil
 	}
 
@@ -353,7 +349,7 @@ Loop:
 			break Loop
 		case <-t.C:
 			if err := runMaintenance(doMaintenance); err != nil {
-				l.logger.Error("Running maintenance failed", "err", err)
+				level.Error(l.logger).Log("msg", "Running maintenance failed", "err", err)
 			}
 		}
 	}
@@ -363,7 +359,7 @@ Loop:
 		return
 	}
 	if err := runMaintenance(doMaintenance); err != nil {
-		l.logger.Error("Creating shutdown snapshot failed", "err", err)
+		level.Error(l.logger).Log("msg", "Creating shutdown snapshot failed", "err", err)
 	}
 }
 
@@ -534,7 +530,7 @@ func (l *Log) Merge(b []byte) error {
 			// all nodes already.
 			l.broadcast(b)
 			l.metrics.propagatedMessagesTotal.Inc()
-			l.logger.Debug("gossiping new entry", "entry", e)
+			level.Debug(l.logger).Log("msg", "gossiping new entry", "entry", e)
 		}
 	}
 	return nil

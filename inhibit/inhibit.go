@@ -15,10 +15,11 @@ package inhibit
 
 import (
 	"context"
-	"log/slog"
 	"sync"
 	"time"
 
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/oklog/run"
 	"github.com/prometheus/common/model"
 
@@ -35,15 +36,15 @@ import (
 type Inhibitor struct {
 	alerts provider.Alerts
 	rules  []*InhibitRule
-	marker types.AlertMarker
-	logger *slog.Logger
+	marker types.Marker
+	logger log.Logger
 
 	mtx    sync.RWMutex
 	cancel func()
 }
 
 // NewInhibitor returns a new Inhibitor.
-func NewInhibitor(ap provider.Alerts, rs []config.InhibitRule, mk types.AlertMarker, logger *slog.Logger) *Inhibitor {
+func NewInhibitor(ap provider.Alerts, rs []config.InhibitRule, mk types.Marker, logger log.Logger) *Inhibitor {
 	ih := &Inhibitor{
 		alerts: ap,
 		marker: mk,
@@ -66,14 +67,14 @@ func (ih *Inhibitor) run(ctx context.Context) {
 			return
 		case a := <-it.Next():
 			if err := it.Err(); err != nil {
-				ih.logger.Error("Error iterating alerts", "err", err)
+				level.Error(ih.logger).Log("msg", "Error iterating alerts", "err", err)
 				continue
 			}
 			// Update the inhibition rules' cache.
 			for _, r := range ih.rules {
 				if r.SourceMatchers.Matches(a.Labels) {
 					if err := r.scache.Set(a); err != nil {
-						ih.logger.Error("error on set alert", "err", err)
+						level.Error(ih.logger).Log("msg", "error on set alert", "err", err)
 					}
 				}
 			}
@@ -105,7 +106,7 @@ func (ih *Inhibitor) Run() {
 	})
 
 	if err := g.Run(); err != nil {
-		ih.logger.Warn("error running inhibitor", "err", err)
+		level.Warn(ih.logger).Log("msg", "error running inhibitor", "err", err)
 	}
 }
 
@@ -214,7 +215,7 @@ func NewInhibitRule(cr config.InhibitRule) *InhibitRule {
 
 	equal := map[model.LabelName]struct{}{}
 	for _, ln := range cr.Equal {
-		equal[model.LabelName(ln)] = struct{}{}
+		equal[ln] = struct{}{}
 	}
 
 	return &InhibitRule{
@@ -230,11 +231,10 @@ func NewInhibitRule(cr config.InhibitRule) *InhibitRule {
 // is returned. If excludeTwoSidedMatch is true, alerts that match both the
 // source and the target side of the rule are disregarded.
 func (r *InhibitRule) hasEqual(lset model.LabelSet, excludeTwoSidedMatch bool) (model.Fingerprint, bool) {
-	now := time.Now()
 Outer:
 	for _, a := range r.scache.List() {
 		// The cache might be stale and contain resolved alerts.
-		if a.ResolvedAt(now) {
+		if a.Resolved() {
 			continue
 		}
 		for n := range r.Equal {

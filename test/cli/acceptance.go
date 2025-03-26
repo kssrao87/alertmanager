@@ -41,7 +41,6 @@ import (
 )
 
 const (
-	// nolint:godot
 	// amtool is the relative path to local amtool binary.
 	amtool = "../../../amtool"
 )

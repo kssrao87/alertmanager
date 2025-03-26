@@ -22,11 +22,12 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net"
 	"strings"
 	"time"
 
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/hashicorp/go-sockaddr"
 	"github.com/hashicorp/memberlist"
 	"github.com/prometheus/client_golang/prometheus"
@@ -45,7 +46,7 @@ const (
 type TLSTransport struct {
 	ctx          context.Context
 	cancel       context.CancelFunc
-	logger       *slog.Logger
+	logger       log.Logger
 	bindAddr     string
 	bindPort     int
 	done         chan struct{}
@@ -70,7 +71,7 @@ type TLSTransport struct {
 // a free port automatically.
 func NewTLSTransport(
 	ctx context.Context,
-	logger *slog.Logger,
+	logger log.Logger,
 	reg prometheus.Registerer,
 	bindAddr string,
 	bindPort int,
@@ -187,7 +188,7 @@ func (t *TLSTransport) StreamCh() <-chan net.Conn {
 // Shutdown is called when memberlist is shutting down; this gives the
 // TLS Transport a chance to clean up the listener and other goroutines.
 func (t *TLSTransport) Shutdown() error {
-	t.logger.Debug("shutting down tls transport")
+	level.Debug(t.logger).Log("msg", "shutting down tls transport")
 	t.cancel()
 	err := t.listener.Close()
 	t.connPool.shutdown()
@@ -254,7 +255,7 @@ func (t *TLSTransport) listen() {
 					return
 				}
 				t.readErrs.Inc()
-				t.logger.Debug("error accepting connection", "err", err)
+				level.Debug(t.logger).Log("msg", "error accepting connection", "err", err)
 
 			} else {
 				go t.handle(conn)
@@ -267,7 +268,7 @@ func (t *TLSTransport) handle(conn net.Conn) {
 	for {
 		packet, err := rcvTLSConn(conn).read()
 		if err != nil {
-			t.logger.Debug("error reading from connection", "err", err)
+			level.Debug(t.logger).Log("msg", "error reading from connection", "err", err)
 			t.readErrs.Inc()
 			return
 		}

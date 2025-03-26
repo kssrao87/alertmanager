@@ -25,6 +25,5 @@ alertsParser =
         <?> Query.string "receiver"
         <?> maybeBoolParam "silenced"
         <?> maybeBoolParam "inhibited"
-        <?> maybeBoolParam "muted"
         <?> maybeBoolParam "active"
         |> map Filter

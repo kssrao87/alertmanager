@@ -25,9 +25,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-kit/log"
 	commoncfg "github.com/prometheus/common/config"
 	"github.com/prometheus/common/model"
-	"github.com/prometheus/common/promslog"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 
@@ -46,7 +46,6 @@ receivers:
   telegram_configs:
   - chat_id: 1234
     bot_token: secret
-    message_thread_id: 1357
 `
 	var c config.Config
 	err := yaml.Unmarshal([]byte(in), &c)
@@ -58,7 +57,6 @@ receivers:
 	require.Equal(t, "https://api.telegram.org", c.Receivers[0].TelegramConfigs[0].APIUrl.String())
 	require.Equal(t, config.Secret("secret"), c.Receivers[0].TelegramConfigs[0].BotToken)
 	require.Equal(t, int64(1234), c.Receivers[0].TelegramConfigs[0].ChatID)
-	require.Equal(t, 1357, c.Receivers[0].TelegramConfigs[0].MessageThreadID)
 	require.Equal(t, "HTML", c.Receivers[0].TelegramConfigs[0].ParseMode)
 }
 
@@ -76,7 +74,7 @@ func TestTelegramRetry(t *testing.T) {
 			APIUrl:     &fakeURL,
 		},
 		test.CreateTmpl(t),
-		promslog.NewNopLogger(),
+		log.NewNopLogger(),
 	)
 	require.NoError(t, err)
 
@@ -142,7 +140,7 @@ func TestTelegramNotify(t *testing.T) {
 
 			tc.cfg.APIUrl = &config.URL{URL: u}
 
-			notifier, err := New(&tc.cfg, test.CreateTmpl(t), promslog.NewNopLogger())
+			notifier, err := New(&tc.cfg, test.CreateTmpl(t), log.NewNopLogger())
 			require.NoError(t, err)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
